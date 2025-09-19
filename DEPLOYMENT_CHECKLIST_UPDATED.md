@@ -85,7 +85,7 @@
 ## Port Reference 🌐
 
 - **30000**: Prometheus (Metrics)
-- **30080**: IMDb API (Application) 
+- **30080**: IMDb API (Application)
 - **31080**: Heartbeat (Health Checks)
 - **32000**: Grafana (Dashboards)
 
@@ -98,7 +98,7 @@ kic cluster deploy          # Deploy applications (~1 minute)
 kic cluster rebuild         # Full rebuild (~3 minutes)
 kic cluster delete          # Delete cluster (~30 seconds)
 
-# Application Management  
+# Application Management
 kic build imdb             # Build IMDb app (~1 minute)
 kic build webv             # Build WebValidate (~1 minute)
 kic pods                   # List all pods
@@ -135,7 +135,7 @@ docker volume prune -f
 
 **Full Manual Deployment from scratch:**
 - Environment setup: ~2 minutes
-- Application cloning and restore: ~3 minutes  
+- Application cloning and restore: ~3 minutes
 - Cluster creation: ~2 minutes
 - Application builds: ~2 minutes
 - Deployment: ~1 minute

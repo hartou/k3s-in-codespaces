@@ -1,0 +1,59 @@
+---
+# NodePort Service for Store Front (Customer UI)
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-front-nodeport
+  namespace: pets
+  labels:
+    app: store-front
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30090
+      protocol: TCP
+      name: http
+  selector:
+    app: store-front
+
+---
+# NodePort Service for Store Admin (Admin UI)
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-admin-nodeport  
+  namespace: pets
+  labels:
+    app: store-admin
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 8081
+      nodePort: 30091
+      protocol: TCP
+      name: http
+  selector:
+    app: store-admin
+
+---
+# NodePort Service for RabbitMQ Management UI
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-management-nodeport
+  namespace: pets
+  labels:
+    app: rabbitmq
+spec:
+  type: NodePort
+  ports:
+    - port: 15672
+      targetPort: 15672
+      nodePort: 30092
+      protocol: TCP
+      name: management
+  selector:
+    app: rabbitmq
