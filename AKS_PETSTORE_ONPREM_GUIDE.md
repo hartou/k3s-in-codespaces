@@ -1,9 +1,9 @@
 # AKS Pet Store On-Premises Deployment Guide
 
-> **Version**: 1.2  
-> **Target Environment**: On-Premises Kubernetes / Local Servers  
-> **Application**: Microsoft AKS Store Demo (Pet Store)  
-> **Compatibility**: Any Kubernetes distribution (K3s, K8s, MicroK8s, etc.)  
+> **Version**: 1.2
+> **Target Environment**: On-Premises Kubernetes / Local Servers
+> **Application**: Microsoft AKS Store Demo (Pet Store)
+> **Compatibility**: Any Kubernetes distribution (K3s, K8s, MicroK8s, etc.)
 > **Red Hat Ready**: Optimized for RHEL 9, includes RHEL/CentOS/Fedora instructions
 
 ## 🎯 Overview
@@ -133,7 +133,46 @@ sudo systemctl status k3s
 sudo k3s kubectl get nodes
 
 # Start K3s on boot (Red Hat systems)
+# Note: On RHEL 9, the service might not be created automatically
 sudo systemctl enable k3s
+
+# RHEL 9 - If service enable fails, manually create the service
+if ! sudo systemctl is-enabled k3s >/dev/null 2>&1; then
+    echo "Creating K3s service manually for RHEL 9..."
+
+    # Create systemd service file
+    sudo tee /etc/systemd/system/k3s.service > /dev/null <<EOF
+[Unit]
+Description=Lightweight Kubernetes
+Documentation=https://k3s.io
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=notify
+EnvironmentFile=-/etc/systemd/system/k3s.service.env
+KillMode=process
+Delegate=yes
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+Restart=always
+RestartSec=5s
+ExecStartPre=-/sbin/modprobe br_netfilter
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/local/bin/k3s server
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Reload systemd and enable service
+    sudo systemctl daemon-reload
+    sudo systemctl enable k3s
+    sudo systemctl start k3s
+fi
 
 # RHEL 9 - Verify cgroup version being used
 cat /sys/fs/cgroup/cgroup.controllers
@@ -219,7 +258,95 @@ k3d kubeconfig merge petstore --kubeconfig-switch-context
 kubectl get nodes
 ```
 
-### K3s Post-Installation Configuration
+### Option 4: RHEL 9 Manual Installation (If Service Installation Fails)
+
+If the standard K3s installation fails to create the systemd service properly on RHEL 9, use this manual approach:
+
+```bash
+# RHEL 9 - Manual K3s installation without systemd service
+# This approach runs K3s directly without systemd integration
+
+# 1. Install prerequisites first
+sudo dnf install -y container-selinux selinux-policy-base container-tools podman
+sudo dnf install -y https://rpm.rancher.io/k3s/latest/common/centos/9/noarch/k3s-selinux-1.4-1.el9.noarch.rpm
+
+# 2. Configure firewall
+sudo firewall-cmd --permanent --add-port=30080-30092/tcp
+sudo firewall-cmd --permanent --add-port=6443/tcp    # K3s API server
+sudo firewall-cmd --permanent --add-port=10250/tcp   # kubelet
+sudo firewall-cmd --reload
+
+# 3. Configure SELinux
+sudo setsebool -P container_manage_cgroup true
+sudo setsebool -P container_use_cephfs true
+
+# 4. Download and install K3s binary manually
+curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -
+
+# 5. Create data directory
+sudo mkdir -p /var/lib/rancher/k3s
+
+# 6. Start K3s manually (run in background)
+sudo nohup /usr/local/bin/k3s server > /var/log/k3s.log 2>&1 &
+
+# 7. Wait for K3s to start
+sleep 30
+
+# 8. Verify K3s is running
+sudo /usr/local/bin/k3s kubectl get nodes
+
+# 9. Set up kubectl access
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+
+# 10. Test kubectl access
+kubectl get nodes
+
+# 11. Create a simple systemctl-like script for management
+sudo tee /usr/local/bin/k3s-manage > /dev/null <<'EOF'
+#!/bin/bash
+case "$1" in
+  start)
+    if ! pgrep -f "k3s server" > /dev/null; then
+      sudo nohup /usr/local/bin/k3s server > /var/log/k3s.log 2>&1 &
+      echo "K3s started"
+    else
+      echo "K3s is already running"
+    fi
+    ;;
+  stop)
+    sudo pkill -f "k3s server"
+    echo "K3s stopped"
+    ;;
+  status)
+    if pgrep -f "k3s server" > /dev/null; then
+      echo "K3s is running"
+    else
+      echo "K3s is not running"
+    fi
+    ;;
+  restart)
+    $0 stop
+    sleep 5
+    $0 start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|restart}"
+    exit 1
+    ;;
+esac
+EOF
+
+# Make the script executable
+sudo chmod +x /usr/local/bin/k3s-manage
+
+# Usage:
+# sudo k3s-manage start
+# sudo k3s-manage stop
+# sudo k3s-manage status
+# sudo k3s-manage restart
+```
 
 #### Install Local Storage Provisioner (If Needed)
 ```bash
@@ -329,6 +456,34 @@ kubectl get pods -n local-path-storage
 
 **5. RHEL 9 Specific Issues**
 ```bash
+# K3s service installation failures on RHEL 9
+# If K3s service doesn't start or enable properly:
+
+# Check if K3s installed correctly but service failed
+which k3s
+ls -la /usr/local/bin/k3s
+
+# Check current service status
+sudo systemctl status k3s
+sudo journalctl -u k3s --no-pager -l
+
+# RHEL 9 - Manually install K3s service if needed
+if ! systemctl list-unit-files | grep -q k3s.service; then
+    echo "Manually creating K3s service..."
+
+    # Stop any running K3s process
+    sudo pkill -f k3s || true
+
+    # Reinstall K3s with explicit service creation
+    curl -sfL https://get.k3s.io | INSTALL_K3S_SYSTEMD_DIR=/etc/systemd/system sh -
+
+    # Reload systemd daemon
+    sudo systemctl daemon-reload
+
+    # Start and enable K3s
+    sudo systemctl enable --now k3s
+fi
+
 # SELinux blocking container operations (RHEL 9 has stricter policies)
 sudo setsebool -P container_manage_cgroup true
 sudo setsebool -P container_use_cephfs true
@@ -344,8 +499,14 @@ sudo dnf update container-selinux container-tools
 sudo subscription-manager status
 sudo subscription-manager list --available
 
-# RHEL 9 - cgroup v2 specific issues (rare, but possible)
-# K3s handles cgroup v2 automatically in RHEL 9
+# RHEL 9 - Alternative: Install K3s without systemd service
+# If service installation keeps failing, run K3s directly:
+# sudo /usr/local/bin/k3s server &
+
+# RHEL 9 - Check for conflicting services
+sudo systemctl list-units --type=service --state=running | grep -E "(docker|podman|containerd)"
+
+# RHEL 9 - Verify cgroup v2 configuration
 mount | grep cgroup
 systemctl --version  # Should be 249+ for proper cgroup v2 support
 
@@ -359,6 +520,10 @@ sudo systemctl stop systemd-resolved
 # RHEL 9 - Container networking debugging
 sudo podman network ls
 sudo firewall-cmd --get-active-zones
+
+# RHEL 9 - Force reinstall if all else fails
+# sudo /usr/local/bin/k3s-uninstall.sh
+# curl -sfL https://get.k3s.io | sh -
 ```
 
 ### K3s Uninstallation (If Needed)
