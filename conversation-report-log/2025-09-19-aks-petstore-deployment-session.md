@@ -1,8 +1,8 @@
 # AKS Pet Store Deployment Session Report
 
-**Date**: September 19, 2025  
-**Session Type**: New Application Deployment  
-**Branch**: `aks-petstore-deployment`  
+**Date**: September 19, 2025
+**Session Type**: New Application Deployment
+**Branch**: `aks-petstore-deployment`
 **Objective**: Deploy Microsoft AKS Pet Store demo application to k3s cluster
 
 ## 📋 Session Overview
@@ -41,7 +41,7 @@ Deploy the Microsoft Learn AKS Store Demo (Pet Store application) to demonstrate
 - **File**: `deploy/pets/nodeport-services.yaml`
 - **Services Exposed**:
   - store-front-nodeport: Port 30090
-  - store-admin-nodeport: Port 30091  
+  - store-admin-nodeport: Port 30091
   - rabbitmq-management-nodeport: Port 30092
 
 ### Step 5: Access Verification
@@ -61,7 +61,7 @@ Deploy the Microsoft Learn AKS Store Demo (Pet Store application) to demonstrate
    - Features: Product catalog, shopping cart, order placement
 
 2. **store-admin** (Vue.js)
-   - Purpose: Administrative management interface  
+   - Purpose: Administrative management interface
    - Port: 80 (NodePort: 31345)
    - Features: Order management, product management, analytics
 
@@ -122,7 +122,7 @@ PersistentVolumeClaims: 2 (Database and queue persistence)
 1. **LoadBalancer Services** (K3d metalLB integration)
    - Automatic external IP assignment
    - Direct access without port mapping
-   
+
 2. **NodePort Services** (Backup access method)
    - Explicit port mapping for guaranteed access
    - Useful for environments without LoadBalancer support
@@ -138,7 +138,7 @@ PersistentVolumeClaims: 2 (Database and queue persistence)
 ### Resource Utilization
 ```bash
 Pods Running: 9/9 (100% success rate)
-Services Active: 11/11 
+Services Active: 11/11
 Persistent Storage: 2 volumes allocated
 Memory Usage: Within cluster limits
 CPU Usage: Minimal load during testing
@@ -150,7 +150,7 @@ CPU Usage: Minimal load during testing
 kubectl get pods -n pets
 NAME                                READY   STATUS    RESTARTS   AGE
 mongodb-0                           1/1     Running   0          20m
-rabbitmq-0                          1/1     Running   0          20m  
+rabbitmq-0                          1/1     Running   0          20m
 order-service-75685c56d8-xxx        1/1     Running   0          20m
 makeline-service-89ddf67b5-xxx      1/1     Running   0          20m
 product-service-5cb9549676-xxx      1/1     Running   0          20m
@@ -172,8 +172,8 @@ virtual-worker-7848d8cd74-xxx       1/1     Running   0          20m
    ```bash
    curl -I http://172.18.0.2
    # HTTP/1.1 200 OK - Store front working
-   
-   curl -I http://172.18.0.2:31345  
+
+   curl -I http://172.18.0.2:31345
    # HTTP/1.1 200 OK - Admin interface working
    ```
 
@@ -269,7 +269,7 @@ virtual-worker-7848d8cd74-xxx       1/1     Running   0          20m
 - ✅ 0 errors or failures during deployment
 - ✅ 100% health check pass rate
 
-### Functionality Success  
+### Functionality Success
 - ✅ Web UIs accessible and rendering correctly
 - ✅ Order simulation active and processing
 - ✅ Database persistence confirmed
@@ -310,7 +310,7 @@ virtual-worker-7848d8cd74-xxx       1/1     Running   0          20m
 **COMPLETE SUCCESS** - The AKS Pet Store deployment exceeded all expectations. We now have a fully operational, production-ready e-commerce platform running on our k3s infrastructure that demonstrates:
 
 - Modern microservices architecture
-- Real business functionality  
+- Real business functionality
 - Cloud-native operational patterns
 - Live simulation and realistic demo scenarios
 

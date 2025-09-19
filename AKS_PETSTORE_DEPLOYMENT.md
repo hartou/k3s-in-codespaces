@@ -2,9 +2,9 @@
 
 ## 🎯 Successfully Deployed AKS Pet Store Demo!
 
-**Branch**: `aks-petstore-deployment`  
-**Namespace**: `pets`  
-**Deployment Date**: September 19, 2025  
+**Branch**: `aks-petstore-deployment`
+**Namespace**: `pets`
+**Deployment Date**: September 19, 2025
 **Status**: ✅ **FULLY OPERATIONAL**
 
 ## 🏗️ Architecture Overview
@@ -22,7 +22,7 @@ The AKS Pet Store is a comprehensive microservices application demonstrating:
 - **Store Front** (Customer UI) - Vue.js application for browsing and ordering
 - **Store Admin** (Management UI) - Vue.js application for managing orders and products
 
-### Backend Microservices  
+### Backend Microservices
 - **Order Service** (Node.js) - Handles order placement and management
 - **Product Service** (Rust) - CRUD operations for product catalog
 - **Makeline Service** (Golang) - Processes orders from queue and completes them
@@ -38,17 +38,17 @@ The AKS Pet Store is a comprehensive microservices application demonstrating:
 ## 🌐 Access URLs
 
 ### Customer Interface (Store Front)
-**URL**: http://localhost:32093  
+**URL**: http://localhost:32093
 **Description**: Customer-facing web application for browsing products and placing orders
 **Features**: Product catalog, shopping cart, order placement
 
-### Admin Interface (Store Admin)  
-**URL**: http://localhost:31345  
+### Admin Interface (Store Admin)
+**URL**: http://localhost:31345
 **Description**: Administrative interface for managing orders and products
 **Features**: Order queue management, product management, analytics
 
 ### RabbitMQ Management (Optional)
-**URL**: http://localhost:30092  
+**URL**: http://localhost:30092
 **Description**: RabbitMQ management interface for monitoring queues
 **Login**: guest/guest (default)
 
@@ -61,7 +61,7 @@ kubectl get pods -n pets
 # Expected output:
 NAME                                READY   STATUS    RESTARTS   AGE
 mongodb-0                           1/1     Running   0          5m
-rabbitmq-0                          1/1     Running   0          5m  
+rabbitmq-0                          1/1     Running   0          5m
 order-service-75685c56d8-xxx        1/1     Running   0          5m
 makeline-service-89ddf67b5-xxx      1/1     Running   0          5m
 product-service-5cb9549676-xxx      1/1     Running   0          5m
@@ -77,7 +77,7 @@ virtual-worker-7848d8cd74-xxx       1/1     Running   0          5m
 - `store-front`: Port 32093 → Internal Port 8080
 - `store-admin`: Port 31345 → Internal Port 8081
 
-### NodePort Services (Additional access points)  
+### NodePort Services (Additional access points)
 - `store-front-nodeport`: Port 30090
 - `store-admin-nodeport`: Port 30091
 - `rabbitmq-management-nodeport`: Port 30092
@@ -86,7 +86,7 @@ virtual-worker-7848d8cd74-xxx       1/1     Running   0          5m
 - `mongodb`: Port 27017
 - `rabbitmq`: Ports 5672 (AMQP), 15672 (Management)
 - `order-service`: Port 3000
-- `makeline-service`: Port 3001  
+- `makeline-service`: Port 3001
 - `product-service`: Port 3002
 
 ## 🎬 Demo Features
@@ -97,7 +97,7 @@ virtual-worker-7848d8cd74-xxx       1/1     Running   0          5m
 3. **Place Orders**: Complete purchase flow
 4. **Order Tracking**: View order status
 
-### Admin Experience  
+### Admin Experience
 1. **Order Management**: View and manage incoming orders
 2. **Product Management**: Add, edit, remove products
 3. **Queue Monitoring**: See orders in processing queue
@@ -160,7 +160,7 @@ kubectl rollout restart deployment/store-front -n pets
 3. **Order Processing**: Full order lifecycle from placement to fulfillment
 4. **Admin Dashboard**: Business insights and operational management
 
-### Technical Excellence  
+### Technical Excellence
 1. **Microservices**: Proper service decomposition and boundaries
 2. **Event-Driven**: Asynchronous processing with message queues
 3. **Persistent Data**: Proper database integration and data modeling
@@ -169,7 +169,7 @@ kubectl rollout restart deployment/store-front -n pets
 
 ### Operational Readiness
 1. **Monitoring**: Health checks and service discovery
-2. **Scaling**: Horizontal scaling capabilities  
+2. **Scaling**: Horizontal scaling capabilities
 3. **Resilience**: Automatic restart and recovery
 4. **Security**: Proper service isolation and access controls
 

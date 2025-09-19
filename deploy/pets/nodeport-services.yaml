@@ -23,7 +23,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: store-admin-nodeport  
+  name: store-admin-nodeport
   namespace: pets
   labels:
     app: store-admin
