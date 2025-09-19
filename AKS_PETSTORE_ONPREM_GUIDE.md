@@ -1,15 +1,16 @@
 # AKS Pet Store On-Premises Deployment Guide
 
-> **Version**: 1.0
-> **Target Environment**: On-Premises Kubernetes / Local Servers
-> **Application**: Microsoft AKS Store Demo (Pet Store)
-> **Compatibility**: Any Kubernetes distribution (K3s, K8s, MicroK8s, etc.)
+> **Version**: 1.2  
+> **Target Environment**: On-Premises Kubernetes / Local Servers  
+> **Application**: Microsoft AKS Store Demo (Pet Store)  
+> **Compatibility**: Any Kubernetes distribution (K3s, K8s, MicroK8s, etc.)  
+> **Red Hat Ready**: Optimized for RHEL 9, includes RHEL/CentOS/Fedora instructions
 
 ## 🎯 Overview
 
 This guide provides step-by-step instructions for deploying the Microsoft AKS Pet Store demo application on your on-premises Kubernetes cluster. The Pet Store is a comprehensive microservices e-commerce platform demonstrating modern cloud-native architecture patterns.
 
-### What You'll Deploy
+**🔴 RHEL 9 Optimized**: This guide is specifically optimized for Red Hat Enterprise Linux 9 with cgroup v2, Podman/container tools, and modern SELinux policies.### What You'll Deploy
 
 - **9 Microservices**: Complete polyglot e-commerce platform
 - **Vue.js Frontend**: Customer store and admin interfaces
@@ -51,8 +52,10 @@ This guide provides step-by-step instructions for deploying the Microsoft AKS Pe
 - **Network**: Internet access for pulling container images
 
 ### Firewall Configuration
+
+#### For Ubuntu/Debian (ufw):
 ```bash
-# Allow NodePort range (adjust for your firewall)
+# Allow NodePort range
 sudo ufw allow 30000:32767/tcp
 
 # Or specific ports we'll use:
@@ -60,6 +63,355 @@ sudo ufw allow 30080/tcp  # Store Front
 sudo ufw allow 30081/tcp  # Store Admin
 sudo ufw allow 30092/tcp  # RabbitMQ Management (optional)
 ```
+
+#### For Red Hat/CentOS/Fedora (firewalld):
+```bash
+# Allow NodePort range
+sudo firewall-cmd --permanent --add-port=30000-32767/tcp
+sudo firewall-cmd --reload
+
+# Or specific ports we'll use:
+sudo firewall-cmd --permanent --add-port=30080/tcp  # Store Front
+sudo firewall-cmd --permanent --add-port=30081/tcp  # Store Admin
+sudo firewall-cmd --permanent --add-port=30092/tcp  # RabbitMQ Management
+sudo firewall-cmd --reload
+
+# Verify firewall rules
+sudo firewall-cmd --list-ports
+
+# Alternative: Add to public zone specifically
+sudo firewall-cmd --zone=public --permanent --add-port=30080-30092/tcp
+sudo firewall-cmd --reload
+```
+
+#### For Red Hat Enterprise Linux (RHEL) - SELinux Considerations:
+```bash
+# Check SELinux status
+sestatus
+
+# If SELinux is enforcing, allow container access
+sudo setsebool -P container_manage_cgroup true
+
+# Allow container networking (if needed)
+sudo semanage port -a -t container_port_t -p tcp 30080-30092
+
+# Or temporarily disable SELinux (not recommended for production)
+# sudo setenforce 0
+```
+
+## 🏠 K3s Local Installation Guide
+
+If you don't have Kubernetes installed yet, K3s is the easiest option for local development and testing. Here's how to install and configure K3s:
+
+### Option 1: Standard K3s Installation (Recommended)
+
+#### Install K3s Server
+```bash
+# For RHEL 9 - Install K3s with optimized settings
+curl -sfL https://get.k3s.io | sh -
+
+# RHEL 9 Prerequisites - Install container tools and SELinux policies
+sudo dnf install -y container-selinux selinux-policy-base container-tools podman
+
+# RHEL 9 specific - Install K3s SELinux policy
+sudo dnf install -y https://rpm.rancher.io/k3s/latest/common/centos/9/noarch/k3s-selinux-1.4-1.el9.noarch.rpm
+
+# For RHEL 8 (legacy)
+# sudo dnf install -y https://rpm.rancher.io/k3s/latest/common/centos/8/noarch/k3s-selinux-1.2-2.el8.noarch.rpm
+
+# RHEL 7 (legacy - not recommended)
+# sudo yum install -y container-selinux selinux-policy-base
+# sudo yum install -y https://rpm.rancher.io/k3s/latest/common/centos/7/noarch/k3s-selinux-0.2-1.el7_8.noarch.rpm
+
+# RHEL 9 specific - Configure for cgroup v2 (default in RHEL 9)
+# K3s automatically detects cgroup v2, no additional configuration needed
+
+# Check installation status
+sudo systemctl status k3s
+
+# Verify cluster is running
+sudo k3s kubectl get nodes
+
+# Start K3s on boot (Red Hat systems)
+sudo systemctl enable k3s
+
+# RHEL 9 - Verify cgroup version being used
+cat /sys/fs/cgroup/cgroup.controllers
+```
+
+#### Configure kubectl Access
+```bash
+# Copy kubeconfig for regular user access
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+
+# Update server address if needed (for remote access)
+# sed -i 's/127.0.0.1/YOUR-SERVER-IP/g' ~/.kube/config
+
+# Test kubectl access
+kubectl get nodes
+```
+
+### Option 2: K3s with Custom Configuration
+
+#### Create K3s Configuration
+```bash
+# Create K3s config directory
+sudo mkdir -p /etc/rancher/k3s
+
+# Create custom configuration
+sudo cat > /etc/rancher/k3s/config.yaml << 'EOF'
+# Disable Traefik (optional - we'll use NodePort)
+disable:
+  - traefik
+
+# Enable features we need
+cluster-init: true
+
+# Set node name
+node-name: "k3s-petstore"
+
+# Kubelet configuration
+kubelet-arg:
+  - "max-pods=110"
+
+# API server configuration
+kube-apiserver-arg:
+  - "service-node-port-range=30000-32767"
+EOF
+
+# Install K3s with custom config
+curl -sfL https://get.k3s.io | sh -
+```
+
+#### Verify Installation
+```bash
+# Check K3s service
+sudo systemctl status k3s
+
+# Check nodes
+kubectl get nodes -o wide
+
+# Check system pods
+kubectl get pods -A
+```
+
+### Option 3: K3d (K3s in Docker) - Alternative
+
+If you prefer Docker-based deployment:
+
+```bash
+# Install K3d
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+# Create K3s cluster in Docker
+k3d cluster create petstore \
+  --port "30080:30080@agent:0" \
+  --port "30081:30081@agent:0" \
+  --port "30092:30092@agent:0" \
+  --agents 1
+
+# Update kubeconfig
+k3d kubeconfig merge petstore --kubeconfig-switch-context
+
+# Verify cluster
+kubectl get nodes
+```
+
+### K3s Post-Installation Configuration
+
+#### Install Local Storage Provisioner (If Needed)
+```bash
+# K3s includes local-path provisioner by default
+kubectl get storageclass
+
+# If you need additional storage options:
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml
+```
+
+#### Install Metrics Server (For HPA)
+```bash
+# Install metrics-server for horizontal pod autoscaling
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# Patch metrics-server for local development (insecure TLS)
+kubectl patch deployment metrics-server -n kube-system --type='json' \
+  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+
+# Verify metrics-server
+kubectl top nodes
+```
+
+#### Configure Container Runtime (Optional)
+```bash
+# Check current runtime
+kubectl get nodes -o wide
+
+# K3s uses containerd by default - no changes needed
+# For Docker runtime (if needed):
+# curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--docker" sh -
+```
+
+### K3s Cluster Management
+
+#### Useful K3s Commands
+```bash
+# Start/Stop K3s
+sudo systemctl start k3s
+sudo systemctl stop k3s
+
+# Enable/Disable auto-start
+sudo systemctl enable k3s
+sudo systemctl disable k3s
+
+# View K3s logs
+sudo journalctl -u k3s -f
+
+# Check K3s configuration
+sudo cat /etc/rancher/k3s/k3s.yaml
+```
+
+#### Add Worker Nodes (Optional)
+```bash
+# On master node - get token
+sudo cat /var/lib/rancher/k3s/server/node-token
+
+# On worker nodes - join cluster
+curl -sfL https://get.k3s.io | K3S_URL=https://MASTER-IP:6443 \
+  K3S_TOKEN=NODE-TOKEN sh -
+
+# Verify nodes
+kubectl get nodes
+```
+
+### K3s Troubleshooting
+
+#### Common Issues and Solutions
+
+**1. Permission Denied**
+```bash
+# Fix kubeconfig permissions
+sudo chown $(id -u):$(id -g) ~/.kube/config
+chmod 600 ~/.kube/config
+```
+
+**2. Pod Startup Issues**
+```bash
+# Check system resources
+df -h
+free -h
+
+# Check K3s logs
+sudo journalctl -u k3s --no-pager -l
+
+# Restart K3s if needed
+sudo systemctl restart k3s
+```
+
+**3. Network Issues**
+```bash
+# Check CNI
+kubectl get pods -n kube-system | grep -E "(flannel|calico|cilium)"
+
+# Check node status
+kubectl describe nodes
+```
+
+**4. Storage Issues**
+```bash
+# Check storage class
+kubectl get storageclass
+
+# Check local-path provisioner
+kubectl get pods -n local-path-storage
+```
+
+**5. RHEL 9 Specific Issues**
+```bash
+# SELinux blocking container operations (RHEL 9 has stricter policies)
+sudo setsebool -P container_manage_cgroup true
+sudo setsebool -P container_use_cephfs true
+sudo ausearch -m avc -ts recent | grep k3s
+
+# Check if firewalld is blocking traffic
+sudo firewall-cmd --list-all
+
+# RHEL 9 - Fix container runtime issues
+sudo dnf update container-selinux container-tools
+
+# Check Red Hat subscription status (RHEL 9)
+sudo subscription-manager status
+sudo subscription-manager list --available
+
+# RHEL 9 - cgroup v2 specific issues (rare, but possible)
+# K3s handles cgroup v2 automatically in RHEL 9
+mount | grep cgroup
+systemctl --version  # Should be 249+ for proper cgroup v2 support
+
+# RHEL 9 - Check container storage configuration
+podman info | grep -A5 storage
+
+# Fix systemd-resolved conflicts (if using custom DNS)
+sudo systemctl disable systemd-resolved
+sudo systemctl stop systemd-resolved
+
+# RHEL 9 - Container networking debugging
+sudo podman network ls
+sudo firewall-cmd --get-active-zones
+```
+
+### K3s Uninstallation (If Needed)
+
+```bash
+# Uninstall K3s completely
+sudo /usr/local/bin/k3s-uninstall.sh
+
+# Clean up remaining files
+sudo rm -rf /etc/rancher/k3s
+sudo rm -rf /var/lib/rancher/k3s
+rm -rf ~/.kube
+```
+
+### K3s Performance Tuning
+
+#### Resource Limits
+```bash
+# Check current limits
+kubectl describe node | grep -A 5 "Allocated resources"
+
+# Adjust K3s resource limits if needed
+sudo systemctl edit k3s
+
+# Add under [Service]:
+[Service]
+Environment="K3S_NODE_NAME=petstore-node"
+Environment="K3S_KUBELET_ARGS=--max-pods=50"
+```
+
+#### Network Performance
+```bash
+# For high-performance networking
+sudo cat >> /etc/rancher/k3s/config.yaml << 'EOF'
+flannel-backend: "host-gw"  # Higher performance than VXLAN
+EOF
+
+sudo systemctl restart k3s
+```
+
+### K3s vs Other Kubernetes Options
+
+| Feature | K3s | K8s (kubeadm) | MicroK8s | K3d |
+|---------|-----|---------------|-----------|-----|
+| **Installation Time** | ~2 minutes | ~15 minutes | ~5 minutes | ~1 minute |
+| **Resource Usage** | Low (512MB) | High (2GB+) | Medium (1GB) | Very Low (Docker) |
+| **Production Ready** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ Dev only |
+| **Multi-node** | ✅ Easy | ✅ Complex | ✅ Easy | ✅ Docker-based |
+| **Storage** | ✅ Built-in | ⚙️ Manual | ✅ Built-in | ✅ Built-in |
+| **Load Balancer** | ✅ Built-in | ❌ Manual | ✅ Add-on | ✅ Built-in |
+| **Best For** | Edge/IoT/Dev | Enterprise | Ubuntu/Snap | Development |
+
+**Recommendation**: Use **K3s** for this Pet Store deployment - it's the easiest to install and manage while being production-ready.
 
 ## 🚀 Quick Start Deployment
 
@@ -429,11 +781,22 @@ wget -qO- http://order-service.pets.svc.cluster.local:3000/health
 # Check NodePort accessibility
 sudo netstat -tulpn | grep :30080
 
-# Verify firewall rules
-sudo ufw status
+# For Red Hat systems - Check firewalld
+sudo firewall-cmd --list-ports
+sudo firewall-cmd --list-all
+
+# Verify firewall rules are active
+sudo firewall-cmd --state
 
 # Check if service is listening
 curl -v http://YOUR-SERVER-IP:30080
+
+# Red Hat specific - Check SELinux denials
+sudo ausearch -m avc -ts recent | grep -i denied
+
+# Temporarily allow all traffic (troubleshooting only)
+sudo firewall-cmd --set-default-zone=trusted
+# Remember to reset: sudo firewall-cmd --set-default-zone=public
 ```
 
 ## 🔒 Security Considerations
@@ -592,22 +955,41 @@ kubectl get all,configmap,secret,pvc -n pets -o yaml > pets-backup-$(date +%Y%m%
 
 ### Essential Commands
 ```bash
-# Deployment
+# RHEL 9 Optimized Installation
+# 1. Install prerequisites
+sudo dnf install -y container-selinux selinux-policy-base container-tools podman
+sudo dnf install -y https://rpm.rancher.io/k3s/latest/common/centos/9/noarch/k3s-selinux-1.4-1.el9.noarch.rpm
+
+# 2. Configure firewall for RHEL 9
+sudo firewall-cmd --permanent --add-port=30080-30092/tcp
+sudo firewall-cmd --reload
+
+# 3. Install and configure K3s
+curl -sfL https://get.k3s.io | sh -
+mkdir -p ~/.kube && sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+
+# 4. Deploy Pet Store
 kubectl create namespace pets
 kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/main/aks-store-all-in-one.yaml -n pets
 kubectl apply -f pets-onprem-services.yaml
 
-# Monitoring
+# 5. Monitor and Access
 kubectl get pods -n pets
 kubectl get svc -n pets
 kubectl logs <pod-name> -n pets
 
-# Access
+# 6. Get Access URLs
 SERVER_IP=$(hostname -I | awk '{print $1}')
-echo "Store Front: http://$SERVER_IP:30080"
-echo "Admin Interface: http://$SERVER_IP:30081"
+echo "🏪 Store Front: http://$SERVER_IP:30080"
+echo "👨‍💼 Admin Interface: http://$SERVER_IP:30081"
 
-# Cleanup
+# 7. RHEL 9 Specific Verification
+sestatus  # Check SELinux status
+cat /sys/fs/cgroup/cgroup.controllers  # Verify cgroup v2
+sudo firewall-cmd --list-ports  # Verify firewall rules
+
+# 8. Cleanup (when done)
 kubectl delete namespace pets
 ```
 
